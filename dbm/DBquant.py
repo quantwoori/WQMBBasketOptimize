@@ -38,7 +38,7 @@ class PyQuantiwise:
 
         self.STKESS = ['TRD_DT', 'STK_CD', 'VAL']
         self.INDESS = ['TRD_DT', 'SEC_CD', 'VAL']
-        self.CSSESS = ['CNS_DT', 'CMP_CD', 'VAL']
+        self.CSSESS = ['CNS_DT', 'CMP_CD', 'YYMM', 'VAL']
 
     def __version__(self):
         return "PyQuantiwise 2.0.0"
@@ -80,12 +80,17 @@ class PyQuantiwise:
     @staticmethod
     def __multi_qry(ls:Iterable, typ:str) -> str:
         result = list()
-        if typ == 'S':
+        if typ == 'S':  # Stocks
             for i in ls:
                 result.append(
                     f"STK_CD = '{i}'"
                 )
-        else:
+        elif typ == 'C':  # Concensus
+            for i in ls:
+                result.append(
+                    f"CMP_CD = '{i}'"
+                )
+        else:  # Index
             for i in ls:
                 result.append(
                     f"SEC_CD = '{i}'"
@@ -171,10 +176,57 @@ class PyQuantiwise:
         res = pd.DataFrame(res, columns=self.IND)
         return res[self.INDESS]
 
-    def css_data(self, index_code:str, start_date:str, end_date:str,
-                 item:str, tablename='TT_CMP_CNS_DATA') -> pd.DataFrame:
+    def css_data(self, stock_code:str, start_date:str, end_date:str,
+                 item:str, concensus_period:str, tablename='TT_CMP_CNS_DATA') -> pd.DataFrame:
         assert len(start_date) == 8, "start_date out of range"
         assert len(end_date) == 8, "end_date out of range"
         assert item in Consensus.QRY_CODE.keys(), 'item out of range'
+        assert concensus_period in Consensus.QRY_PERIOD.keys(), 'concensus_period out of scope'
 
-        raise NotImplementedError
+        item_code = Consensus.QRY_CODE[item][0]
+        period_code = Consensus.QRY_PERIOD[concensus_period]
+        restrict = [
+            f"CMP_CD = '{stock_code}'",
+            f"ITEM_CD = '{item_code}'",
+            f"TERM_TYP = {period_code}",
+            f"CNS_DT >= '{start_date}'",
+            f"CNS_DT <= '{end_date}'",
+        ]
+        restrict = ' and '.join(restrict)
+        res = self.server.select_db(
+            database="WFNR2DB",
+            schema="dbo",
+            table=tablename,
+            column=self.CSS,
+            condition=restrict
+        )
+        res = pd.DataFrame(res, columns=self.CSS)
+        return res[self.CSSESS]
+
+    def css_data_multi(self, stock_code_ls: Iterable, start_date: str, end_date: str,
+                       item: str, concensus_period: str, tablename='TT_CMP_CNS_DATA') -> pd.DataFrame:
+        assert len(start_date) == 8, "start_date out of range"
+        assert len(end_date) == 8, "end_date out of range"
+        assert item in Consensus.QRY_CODE.keys(), 'item out of range'
+        assert concensus_period in Consensus.QRY_PERIOD.keys(), 'concensus_period out of scope'
+
+        item_code = Consensus.QRY_CODE[item][0]
+        period_code = Consensus.QRY_PERIOD[concensus_period]
+        restrict = [
+            self.__multi_qry(ls=stock_code_ls, typ='C'),
+            f"ITEM_CD = '{item_code}'",
+            f"TERM_TYP = {period_code}",
+            f"CNS_DT >= '{start_date}'",
+            f"CNS_DT <= '{end_date}'",
+        ]
+        restrict = ' and '.join(restrict)
+
+        res = self.server.select_db(
+            database="WFNR2DB",
+            schema="dbo",
+            table=tablename,
+            column=self.CSS,
+            condition=restrict
+        )
+        res = pd.DataFrame(res, columns=self.CSS)
+        return res[self.CSSESS]
