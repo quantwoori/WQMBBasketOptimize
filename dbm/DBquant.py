@@ -177,14 +177,14 @@ class PyQuantiwise:
         return res[self.INDESS]
 
     def css_data(self, stock_code:str, start_date:str, end_date:str,
-                 item:str, concensus_period:str, tablename='TT_CMP_CNS_DATA') -> pd.DataFrame:
+                 item:str, consensus_period:str, tablename='TT_CMP_CNS_DATA') -> pd.DataFrame:
         assert len(start_date) == 8, "start_date out of range"
         assert len(end_date) == 8, "end_date out of range"
         assert item in Consensus.QRY_CODE.keys(), 'item out of range'
-        assert concensus_period in Consensus.QRY_PERIOD.keys(), 'concensus_period out of scope'
+        assert consensus_period in Consensus.QRY_PERIOD.keys(), 'consensus_period out of scope'
 
         item_code = Consensus.QRY_CODE[item][0]
-        period_code = Consensus.QRY_PERIOD[concensus_period]
+        period_code = Consensus.QRY_PERIOD[consensus_period]
         restrict = [
             f"CMP_CD = '{stock_code}'",
             f"ITEM_CD = '{item_code}'",
@@ -204,14 +204,14 @@ class PyQuantiwise:
         return res[self.CSSESS]
 
     def css_data_multi(self, stock_code_ls: Iterable, start_date: str, end_date: str,
-                       item: str, concensus_period: str, tablename='TT_CMP_CNS_DATA') -> pd.DataFrame:
+                       item: str, consensus_period: str, tablename='TT_CMP_CNS_DATA') -> pd.DataFrame:
         assert len(start_date) == 8, "start_date out of range"
         assert len(end_date) == 8, "end_date out of range"
         assert item in Consensus.QRY_CODE.keys(), 'item out of range'
-        assert concensus_period in Consensus.QRY_PERIOD.keys(), 'concensus_period out of scope'
+        assert consensus_period in Consensus.QRY_PERIOD.keys(), 'consensus_period out of scope'
 
         item_code = Consensus.QRY_CODE[item][0]
-        period_code = Consensus.QRY_PERIOD[concensus_period]
+        period_code = Consensus.QRY_PERIOD[consensus_period]
         restrict = [
             self.__multi_qry(ls=stock_code_ls, typ='C'),
             f"ITEM_CD = '{item_code}'",
