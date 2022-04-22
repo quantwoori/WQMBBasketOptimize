@@ -15,7 +15,7 @@ class PortfolioOptimize:
             benchmark_ncol=benchmark.columns,
             ordering_ncol=factor_order,
             benchmark_key="CONSTITUENT_CODE",
-            ordering_key="index"
+            ordering_key="index_name"
         )
 
     @staticmethod
