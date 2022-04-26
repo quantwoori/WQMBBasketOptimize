@@ -1,5 +1,5 @@
 # Global Constant for Optimizing Portfolio
-STOCK_BOUNDARY = 4  # in percent point
+STOCK_BOUNDARY = 0.1  # in percent point
 
 
 # Quantiwise table Configure
