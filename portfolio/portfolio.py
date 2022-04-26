@@ -4,18 +4,18 @@ import scipy.optimize
 import pandas as pd
 import numpy as np
 
-from typing import List, Iterable
+from typing import List, Iterable, Set
 
 
 class PortfolioOptimize:
-    def __init__(self, benchmark:pd.DataFrame, factor_order:pd.DataFrame):
+    def __init__(self, benchmark:pd.DataFrame, factor_order:pd.DataFrame, benchmark_key:str, order_key:str):
         self.data = self.process_data(
             benchmark=benchmark,
             score_order=factor_order,
             benchmark_ncol=benchmark.columns,
-            ordering_ncol=factor_order,
-            benchmark_key="CONSTITUENT_CODE",
-            ordering_key="index_name"
+            ordering_ncol=factor_order.columns,
+            benchmark_key=benchmark_key,
+            ordering_key=order_key
         )
 
     @staticmethod
@@ -44,10 +44,7 @@ class PortfolioOptimize:
         data = data[result_col]
 
         # Change name
-        data.columns = ['stkcode', 'weight', 'fscore']
-
-        # Add Column isin_order
-        data['isin_order'] = np.sign(data['fscore'] + 1).fillna(0)
+        data.columns = ['stkcode', 'cap', 'weight', 'fscore']
         return data
 
     # constraint_eq_left and right:
@@ -73,30 +70,95 @@ class PortfolioOptimize:
         """
         sum of scores should be MINIMUM
         """
-        return (self.data['fscore'].fillna() * -1).to_numpy().flatten().tolist()
+        return (self.data['fscore'].fillna(0) * -1).to_numpy().flatten().tolist()
 
-    @property
-    def boundary_const(self) -> [[float, float],]:
-        result = list()
-        for stk, w, score, ord in self.data.to_numpy():
-            if bool(ord):
-                # If weight != 0
-                result.append(
-                    [
-                        max((w - CONST.STOCK_BOUNDARY), 0) / 100,  # weights cannot be negative
-                        (w + CONST.STOCK_BOUNDARY) / 100
-                    ]
-                )
+    # BOUNDARY METHODS
+    @staticmethod
+    def __restraint(d:dict, nks:Iterable):
+        n = list()
+        for i in nks:
+            if i in d.keys():
+                n.append(True)
             else:
-                # [0, 0] boundary.
-                result.append([0, 0])
+                n.append(False)
+        if len(n) > 0 and all(n):
+            return True
+        else:
+            return False
+
+    def __bound_wo_restrict(self):
+        result = list()
+        for stk, _, w, score in self.data.to_numpy():
+            result.append(
+                [
+                    max((w - CONST.STOCK_BOUNDARY), 0) / 100,  # weights cannot be negative
+                    (w + CONST.STOCK_BOUNDARY) / 100
+                ]
+            )
         return result
 
-    def main(self):
-        res = scipy.optimize.linprog(
-            c=self.objective_const,
-            A_eq=self.constraint_eq_left,
-            b_eq=self.constraint_eq_right,
-            bounds=self.boundary_const,
-        )
+    def __bound_w_restrict(self, high_rest, low_rest):
+        result = list()
+        for stk, _, w, score in self.data.to_numpy():
+            # If in restriction
+            c0 = stk in low_rest
+            c1 = stk in high_rest
+            if c0 or c1:
+                result.append(
+                    [max((w - CONST.STOCK_BOUNDARY), 0) / 100,
+                     (w + CONST.STOCK_BOUNDARY) / 100]
+                )
+
+            # For stocks not in restrictions <- stick it to bm ratio
+            else:
+                result.append([w / 100, w / 100])
+        return result
+
+    def boundary_const(self, **kwargs) -> [[float, float],]:
+        """
+        :param kwargs: high, low
+
+        restrictions meaning:
+            restrictions limits the number of stocks that can be over or under weighted.
+            If there is a restriction,
+                cnd_yes_restriction will take you to __bound_w_restrict
+            else:
+                cnd_no_restriction will take you to __bound_wo_restrict
+        """
+        # Key Word Argument Check
+        rstr_h, rstr_l = None, None
+        if self.__restraint(kwargs, ['high', 'low']):
+            rstr_h, rstr_l = kwargs['high'], kwargs['low']
+
+        # If condition has restriction || If condition has no restriction
+        cnd_no_restriction = (rstr_h is None) and (rstr_l is None)
+        cnd_yes_restriction = (rstr_h is not None) and (rstr_l is not None)
+
+        if cnd_no_restriction:
+            return self.__bound_wo_restrict()
+        elif cnd_yes_restriction:
+            return self.__bound_w_restrict(rstr_h, rstr_l)
+        else:
+            raise RuntimeError("Both high and low restriction should be inserted")
+
+    def main(self, **kwargs):
+        cnd_high = "high" in kwargs.keys()
+        cnd_low = "low" in kwargs.keys()
+        if cnd_high and cnd_low:
+            res = scipy.optimize.linprog(
+                c=self.objective_const,
+                A_eq=self.constraint_eq_left,
+                b_eq=self.constraint_eq_right,
+                bounds=self.boundary_const(high=kwargs['high'], low=kwargs['low']),
+            )
+        elif not cnd_high and not cnd_low:
+            res = scipy.optimize.linprog(
+                c=self.objective_const,
+                A_eq=self.constraint_eq_left,
+                b_eq=self.constraint_eq_right,
+                bounds=self.boundary_const(),
+            )
+        else:
+            raise RuntimeError("High must coexist with Low Restraint")
         return res
+
