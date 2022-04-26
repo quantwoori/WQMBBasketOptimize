@@ -185,7 +185,7 @@ class Earnings:
         r = r.pivot_table(values='VAL', columns='CMP_CD', index='CNS_DT')
         return r
 
-    def filters(self, universe:str, period_start:datetime, period_end:datetime, thres:int=5) -> Dict:
+    def filters(self, universe:str, period_start:datetime, period_end:datetime, thres:int=1) -> Dict:
         btd = BackTestDates()
         dates = btd.generate_dates(period_start, period_end)
 
@@ -233,6 +233,7 @@ class Earnings:
             if len(factor_score) >= active_weight * 2:
                 ap[date]['o'] = set(factor_score.index[(-1 * active_weight):])
                 ap[date]['u'] = set(factor_score.index[:active_weight])
+                ap[date]['fs'] = factor_score
             else:
                 print("fucking analysts slacked off", date, len(factor_score))
                 continue
@@ -249,5 +250,6 @@ if __name__ == "__main__":
 
     e = Earnings(U, T1, T2)
     sc = e.get_factors(active_weight=10)
+    # '20220401'
 
 
