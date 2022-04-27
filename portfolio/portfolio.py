@@ -104,10 +104,13 @@ class PortfolioOptimize:
             c0 = stk in low_rest
             c1 = stk in high_rest
             if c0 or c1:
-                result.append(
-                    [max((w - CONST.STOCK_BOUNDARY), 0) / 100,
-                     (w + CONST.STOCK_BOUNDARY) / 100]
-                )
+                if stk == "373220":
+                    result.append([w / 100, w / 100])
+                else:
+                    result.append(
+                        [max((w - CONST.STOCK_BOUNDARY), 0) / 100,
+                         (w + CONST.STOCK_BOUNDARY) / 100]
+                    )
 
             # For stocks not in restrictions <- stick it to bm ratio
             else:

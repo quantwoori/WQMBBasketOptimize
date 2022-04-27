@@ -185,7 +185,7 @@ class Earnings:
         r = r.pivot_table(values='VAL', columns='CMP_CD', index='CNS_DT')
         return r
 
-    def filters(self, universe:str, period_start:datetime, period_end:datetime, thres:int=1) -> Dict:
+    def filters(self, universe:str, period_start:datetime, period_end:datetime, thres:int=3) -> Dict:
         btd = BackTestDates()
         dates = btd.generate_dates(period_start, period_end)
 
@@ -206,7 +206,7 @@ class Earnings:
 
     @staticmethod
     def __calc_factor_scores(factor1:pd.DataFrame, factor2:pd.DataFrame) -> (pd.Series, str):
-        f1, f2 = factor1.transpose(), factor2.transpose()
+        f1, f2 = factor1.transpose().dropna(), factor2.transpose().dropna()
 
         # Normalize
         f1 = (f1 - f1.mean()).div(f1.std())
