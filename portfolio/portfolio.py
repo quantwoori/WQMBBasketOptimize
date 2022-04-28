@@ -1,5 +1,7 @@
 import settings.Sconstant as CONST
 
+from portfolio.boundary import Boundaries
+
 import scipy.optimize
 import pandas as pd
 import numpy as np
@@ -8,7 +10,10 @@ from typing import List, Iterable, Set
 
 
 class PortfolioOptimize:
-    def __init__(self, benchmark:pd.DataFrame, factor_order:pd.DataFrame, benchmark_key:str, order_key:str):
+    def __init__(self, benchmark_name:str, benchmark:pd.DataFrame,
+                 factor_order:pd.DataFrame, benchmark_key:str, order_key:str):
+        self.BMNAME = benchmark_name
+
         self.data = self.process_data(
             benchmark=benchmark,
             score_order=factor_order,
@@ -74,7 +79,7 @@ class PortfolioOptimize:
 
     # BOUNDARY METHODS
     @staticmethod
-    def __restraint(d:dict, nks:Iterable):
+    def __restraint(d:dict, nks:Iterable) -> bool:
         n = list()
         for i in nks:
             if i in d.keys():
@@ -86,7 +91,7 @@ class PortfolioOptimize:
         else:
             return False
 
-    def __bound_wo_restrict(self):
+    def __bound_wo_restrict(self) -> List:
         result = list()
         for stk, _, w, score in self.data.to_numpy():
             result.append(
@@ -97,20 +102,40 @@ class PortfolioOptimize:
             )
         return result
 
-    def __bound_w_restrict(self, high_rest, low_rest):
+    def __bound_w_restrict(self, key:set) -> List:
+        # SIZE WISE STOCK SPLIT
+        bound = Boundaries(
+            big_firms=CONST.BIG_STOCKS,
+            middle_firms=CONST.MID_STOCKS,
+            small_firms=CONST.SMALL_STOCKS,
+            index_typ=self.BMNAME
+        )
+        b, m, s = bound.sizewise_split()
+
         result = list()
         for stk, _, w, score in self.data.to_numpy():
-            # If in restriction
-            c0 = stk in low_rest
-            c1 = stk in high_rest
-            if c0 or c1:
-                if stk == "373220":
-                    result.append([w / 100, w / 100])
+            # If in restriction <- add boundaries
+            c = stk in key
+            if c:
+                if stk in b:
+                    sizebound = CONST.BIG_BOUND
+                elif stk in b:
+                    sizebound = CONST.MID_BOUND
                 else:
-                    result.append(
-                        [max((w - CONST.STOCK_BOUNDARY), 0) / 100,
-                         (w + CONST.STOCK_BOUNDARY) / 100]
-                    )
+                    sizebound = CONST.SML_BOUND
+
+                result.append(
+                    [
+                        max(
+                            ((w / 100) + sizebound['abs_low']),
+                            ((w / 100) * sizebound['low'])
+                        ),
+                        min(
+                            ((w / 100) + sizebound['abs_upp']),
+                            ((w / 100) * sizebound['upp'])
+                        )
+                    ]
+                )
 
             # For stocks not in restrictions <- stick it to bm ratio
             else:
@@ -129,18 +154,17 @@ class PortfolioOptimize:
                 cnd_no_restriction will take you to __bound_wo_restrict
         """
         # Key Word Argument Check
-        rstr_h, rstr_l = None, None
-        if self.__restraint(kwargs, ['high', 'low']):
-            rstr_h, rstr_l = kwargs['high'], kwargs['low']
+        adjustable = None
+        if self.__restraint(kwargs, ['adjust']):
+            adjustable = kwargs['adjust']
 
         # If condition has restriction || If condition has no restriction
-        cnd_no_restriction = (rstr_h is None) and (rstr_l is None)
-        cnd_yes_restriction = (rstr_h is not None) and (rstr_l is not None)
+        cnd_no_restriction = adjustable is None
 
         if cnd_no_restriction:
             return self.__bound_wo_restrict()
-        elif cnd_yes_restriction:
-            return self.__bound_w_restrict(rstr_h, rstr_l)
+        elif not cnd_no_restriction:
+            return self.__bound_w_restrict(key=adjustable)
         else:
             raise RuntimeError("Both high and low restriction should be inserted")
 
@@ -152,7 +176,7 @@ class PortfolioOptimize:
                 c=self.objective_const,
                 A_eq=self.constraint_eq_left,
                 b_eq=self.constraint_eq_right,
-                bounds=self.boundary_const(high=kwargs['high'], low=kwargs['low']),
+                bounds=self.boundary_const(adjust=kwargs['adjust']),
             )
         elif not cnd_high and not cnd_low:
             res = scipy.optimize.linprog(
