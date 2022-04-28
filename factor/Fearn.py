@@ -213,7 +213,7 @@ class Earnings:
         f2 = (f2 - f2.mean()).div(f2.std())
         return (f1[f1.columns[0]] + f2[f2.columns[0]]).sort_values(), f1.columns[0]
 
-    def get_factors(self, active_weight:int) -> Dict:
+    def get_factors(self, active_weight:int) -> {str: {}}:
         # Filters. Consensus Count <= thres will be eliminated
         fil = self.filters(self.U, self.T0, self.T1)
 
@@ -227,16 +227,12 @@ class Earnings:
 
         print("[WQMB] >>> OVERWEIGHT UNDERWEIGHT DIST.")
         ap = dict()
+
         for fac0, fac1 in zip(f01, f11):
             factor_score, date = self.__calc_factor_scores(fac0, fac1)
             ap[date] = dict()
-            if len(factor_score) >= active_weight * 2:
-                ap[date]['o'] = set(factor_score.index[(-1 * active_weight):])
-                ap[date]['u'] = set(factor_score.index[:active_weight])
-                ap[date]['fs'] = factor_score
-            else:
-                print("fucking analysts slacked off", date, len(factor_score))
-                continue
+            ap[date]['fs'] = factor_score.dropna()
+            ap[date]['keys'] = set(factor_score.dropna().keys())
         return ap
 
 
