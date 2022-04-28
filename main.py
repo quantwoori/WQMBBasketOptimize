@@ -40,10 +40,18 @@ sc = e.get_factors(active_weight=10)
 b, bk = container_benchmark(bw)
 o, ok = container_factor(sc['20220401']['fs'])
 
-p = PortfolioOptimize(b, o, bk, ok)
-r = p.main(high=sc['20220401']['o'], low=sc['20220401']['u'])
+p = PortfolioOptimize("코스피200", b, o, bk, ok)
+r = p.main(adjust=sc['20220401']['keys'])
 
+# Report
 ss = pd.DataFrame(r.x)
 ss.index = bw['CONSTITUENT_CODE'].apply(lambda x: f"A{x}")
-ss.to_csv('result.csv')
-bw.to_csv('weight.csv')
+
+bw['CONSTITUENT_CODE'] = bw['CONSTITUENT_CODE'].apply(lambda x: f"A{x}")
+rpt = pd.concat([ss, bw.set_index('CONSTITUENT_CODE')], axis=1)
+rpt['INDEX_WEIGHT'] = rpt['INDEX_WEIGHT'] / 100
+rpt.columns = ["AP", "_", "BM"]
+rpt["AP - BM"] = rpt["AP"] - rpt["BM"]
+rpt = rpt[["AP", "BM", "AP - BM"]]
+
+rpt.to_csv("result.csv")
