@@ -29,7 +29,7 @@ bw = bm.get_weight(index_type='코스피200')
 # second keys are 'o'  'u'  'fs', for overweight, underweight, and factor score
 T1, T2 = (
     datetime(2022, 1, 1),
-    datetime.today()
+    datetime(2022, 4, 28)
 )
 U = 'ks200'
 e = Earnings(U, T1, T2)
